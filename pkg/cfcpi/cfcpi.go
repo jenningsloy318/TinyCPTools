@@ -172,8 +172,9 @@ func (cfCPIClient *CFCPIClient) GetAccessTokenOauth() {
 	if err != nil {
 		fmt.Printf("Error when generating token from client credentials, %v\n", err)
 	}
-	fmt.Printf("token %v\n", token)
+	fmt.Printf("Access token %v\n", token.AccessToken)
 	oauthClient := cfAuthconfig.Client(ctx)
+	cfCPIClient.accessToken = token.AccessToken
 	cfCPIClient.oauthClient = oauthClient
 }
 func (cfCPIClient *CFCPIClient) GetCFWorkspaceOauth(cfCPIWorkspaceURL string) {
@@ -182,6 +183,12 @@ func (cfCPIClient *CFCPIClient) GetCFWorkspaceOauth(cfCPIWorkspaceURL string) {
 		fmt.Printf("Error when creating http request, %v\n", err)
 	}
 	httpClient := cfCPIClient.oauthClient
+
+	httpReqest.Header.Set("Accept", "application/json")
+
+	bearerToken := fmt.Sprintf("Bearer %s", cfCPIClient.accessToken)
+
+	httpReqest.Header.Set("Authorization", bearerToken)
 	httpResp, err := httpClient.Do(httpReqest)
 
 	if err != nil {
@@ -195,10 +202,12 @@ func (cfCPIClient *CFCPIClient) GetCFWorkspaceOauth(cfCPIWorkspaceURL string) {
 	if err != nil {
 		fmt.Printf("Failed to get response body,%v\n", err)
 	}
+	fmt.Printf("Getting workspace info failed,response body: %v\n", httpResBody)
 
 	if statusCode != 200 {
-		fmt.Printf("Getting workspace info failed,response body: %v\n", string(bodyBytes))
+		fmt.Printf("Getting workspace info failed,response body")
 	}
+	fmt.Printf("Response Body %v\n", string(bodyBytes))
 
 	httpResBody.Close()
 }
