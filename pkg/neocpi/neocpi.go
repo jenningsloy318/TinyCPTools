@@ -131,7 +131,7 @@ func (nclient *NeoCPIClient) GetPkgRegIDList() map[string]string {
 }
 
 func (nclient *NeoCPIClient) ExportPkg(pkg_reg_id string, filePath string) error {
-	apiURL := fmt.Sprintf("https://%s//itspaces/api/1.0/workspace/%s?export=true", nclient.tenantURL, pkg_reg_id)
+	apiURL := fmt.Sprintf("%s//itspaces/api/1.0/workspace/%s?export=true", nclient.tenantURL, pkg_reg_id)
 
 	httpReqest, err := http.NewRequest("GET", apiURL, nil)
 	if err != nil {
