@@ -9,36 +9,44 @@ import (
 
 func main() {
 
-	cfClientID := 
-	cfCientSecret := 
-	cfUsername := 
-	cfPassword := 
-	cfUaaURL := 
-	newCFClient := cfcpi.NewCFClient(cfClientID, cfCientSecret, cfUsername, cfPassword, cfUaaURL)
-	fmt.Printf("Starting to get access token from  %s\n", cfUaaURL)
+	cfClientID := ""
+	cfCientSecret := ""
+	cfUaaTokenURL := ""
 
-	newCFClient.GetAccessTokenOauth()
-	cfCPIWorkspaceURL := 
-	fmt.Printf("Starting to get cf cpi workspace info  %s\n", cfCPIWorkspaceURL)
-	newCFClient.GetCFWorkspaceOauth(cfCPIWorkspaceURL)
+	fmt.Printf("Starting to get access token from  %s\n", cfUaaTokenURL)
+	newCFClient := cfcpi.NewCFClient(cfClientID, cfCientSecret, cfUaaTokenURL)
+	newCFClient.GetAccessToken()
 
-	neoUser := 
-	neoPasswd :=
-	neoCPIURL := 
-	fmt.Printf("Starting to get package reg id  from tenant %s\n", neoCPIURL)
+	cfCpiAPI := ""
+	fmt.Printf("Starting to get cf cpi pcakge list  %s\n", cfCpiAPI)
+	newCFClient.SetCpiAPI(cfCpiAPI)
+	packages := newCFClient.GetIntegrationPackages()
+	for _, id := range packages {
+		fmt.Printf("Starting to get package %s info  \n", id)
 
-	newNeoClient := neocpi.NewNeoCPIClient(neoUser, neoPasswd, neoCPIURL)
+		newCFClient.GetIntegrationPackage(id)
 
-	pkgRegIDList := newNeoClient.GetPkgRegIDList()
-	fmt.Printf("package reg id list: %v\n", pkgRegIDList)
-
-	for name, id := range pkgRegIDList {
-		filePath := id + ".zip"
-		fmt.Printf("Starting to proceed package %s with reg_id %s\n", name, id)
-		err := newNeoClient.ExportPkg(id, filePath)
-		if err != nil {
-			fmt.Printf("error export the package %s, err is %s\n", name, err)
-		}
+		fmt.Printf("Starting to get all iflows inside package %s\n", id)
+		newCFClient.GetIntegrationPackageIflows(id)
 	}
 
+		neoUser := ""
+		neoPasswd := ""
+		neoCPIURL := ""
+		fmt.Printf("Starting to get package reg id  from tenant %s\n", neoCPIURL)
+	
+		newNeoClient := neocpi.NewNeoCPIClient(neoUser, neoPasswd, neoCPIURL)
+	
+		pkgRegIDList := newNeoClient.GetIntegrationPackageRegIDList()
+		fmt.Printf("package reg id list: %v\n", pkgRegIDList)
+	
+		for name, id := range pkgRegIDList {
+			filePath := id + ".zip"
+			fmt.Printf("Starting to proceed package %s with reg_id %s\n", name, id)
+			err := newNeoClient.ExportIntegrationPackage(id, filePath)
+			if err != nil {
+				fmt.Printf("error export the package %s, err is %s\n", name, err)
+			}
+		}
+	
 }

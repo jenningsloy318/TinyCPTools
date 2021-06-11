@@ -87,7 +87,7 @@ func NewNeoCPIClient(username string, password string, tenantURL string) *NeoCPI
 	}
 }
 
-func (nclient *NeoCPIClient) GetPkgRegIDList() map[string]string {
+func (nclient *NeoCPIClient) GetIntegrationPackageRegIDList() map[string]string {
 
 	apiURL := fmt.Sprintf("%s/itspaces/odata/1.0/workspace.svc/ContentEntities.ContentPackages?$format=json", nclient.tenantURL)
 
@@ -130,8 +130,8 @@ func (nclient *NeoCPIClient) GetPkgRegIDList() map[string]string {
 
 }
 
-func (nclient *NeoCPIClient) ExportPkg(pkg_reg_id string, filePath string) error {
-	apiURL := fmt.Sprintf("%s//itspaces/api/1.0/workspace/%s?export=true", nclient.tenantURL, pkg_reg_id)
+func (nclient *NeoCPIClient) ExportIntegrationPackage(package_reg_id string, filePath string) error {
+	apiURL := fmt.Sprintf("%s//itspaces/api/1.0/workspace/%s?export=true", nclient.tenantURL, package_reg_id)
 
 	httpReqest, err := http.NewRequest("GET", apiURL, nil)
 	if err != nil {

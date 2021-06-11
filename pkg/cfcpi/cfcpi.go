@@ -1,7 +1,6 @@
 package cfcpi
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -9,45 +8,16 @@ import (
 	"net/url"
 	"strings"
 	"time"
-
-	"golang.org/x/oauth2/clientcredentials"
 )
 
-type CFCPIResp []struct {
-	ID                 string   `json:"id"`
-	Modifiedby         string   `json:"modifiedBy"`
-	Creationdate       string   `json:"creationDate"`
-	Modifieddate       string   `json:"modifiedDate"`
-	Createdby          string   `json:"createdBy"`
-	Products           []string `json:"products"`
-	Keywords           []string `json:"keywords"`
-	Supportedplatforms []string `json:"supportedPlatforms"`
-	Countries          []string `json:"countries"`
-	Industries         []string `json:"industries"`
-	Lineofbusiness     []string `json:"lineOfBusiness"`
-	Vendor             string   `json:"vendor"`
-	Version            string   `json:"version"`
-	Description        string   `json:"description"`
-	Privilegestate     string   `json:"privilegeState"`
-	Technicalname      string   `json:"technicalName"`
-	Shortdescription   string   `json:"shortDescription"`
-	Partnercontent     bool     `json:"partnerContent"`
-	Updateavailable    bool     `json:"updateAvailable"`
-	Title              string   `json:"title"`
-	Type               string   `json:"type"`
-}
-
 type CFCPIClient struct {
-	httpClient   *http.Client
-	uaaURL       string
-	clientID     string
-	clientSecret string
-	userName     string
-	passWord     string
-	accessToken  string
-	oauthClient  *http.Client
+	client        *http.Client
+	cfUaaTokenURL string
+	clientID      string
+	clientSecret  string
+	accessToken   string
+	cfCpiAPI      string
 }
-
 type authResp struct {
 	AccessToken string `json:"access_token"`
 	TokenType   string `json:"token_type"`
@@ -56,18 +26,19 @@ type authResp struct {
 	Jti         string `json:"jti"`
 }
 
-func NewCFClient(clientID string, clientSecret string, username string, password string, uaaURL string) *CFCPIClient {
+func NewCFClient(clientID string, clientSecret string, cfUaaTokenURL string) *CFCPIClient {
 	return &CFCPIClient{
-		uaaURL:       uaaURL,
-		clientID:     clientID,
-		userName:     username,
-		passWord:     password,
-		clientSecret: clientSecret,
+		cfUaaTokenURL: cfUaaTokenURL,
+		clientID:      clientID,
+		clientSecret:  clientSecret,
 	}
 
 }
+func (cfCPIClient *CFCPIClient) SetCpiAPI(cfCpiAPI string) {
+	cfCPIClient.cfCpiAPI = strings.TrimRight(cfCpiAPI, "/")
+}
 
-func (cfCPIClient *CFCPIClient) GetAccessTokenHttp() {
+func (cfCPIClient *CFCPIClient) GetAccessToken() {
 
 	httpClient := &http.Client{
 		Transport: &http.Transport{
@@ -76,15 +47,13 @@ func (cfCPIClient *CFCPIClient) GetAccessTokenHttp() {
 		Timeout: 10 * time.Second,
 	}
 
-	apiURL := fmt.Sprintf("%s/oauth/token", cfCPIClient.uaaURL)
-
 	params := url.Values{}
 	params.Add("client_id", cfCPIClient.clientID)
 	params.Add("client_secret", cfCPIClient.clientSecret)
 	params.Add("grant_type", "client_credentials")
 	body := strings.NewReader(params.Encode())
 
-	req, err := http.NewRequest("POST", apiURL, body)
+	req, err := http.NewRequest("POST", cfCPIClient.cfUaaTokenURL, body)
 	if err != nil {
 		fmt.Printf("Error occurs when creating http request to fetch acess token,%v", err)
 	}
@@ -118,16 +87,67 @@ func (cfCPIClient *CFCPIClient) GetAccessTokenHttp() {
 	if err != nil {
 		fmt.Printf("Error occurs when decode response to json,%v", err)
 	}
-	token := authRespJson.AccessToken
-	cfCPIClient.accessToken = token
-	cfCPIClient.httpClient = httpClient
+	cfCPIClient.accessToken = authRespJson.AccessToken
+	cfCPIClient.client = httpClient
 }
-func (cfCPIClient *CFCPIClient) GetCFWorkspaceHttp(cfCPIWorkspaceURL string) {
 
-	httpReqest, err := http.NewRequest("POST", cfCPIWorkspaceURL, nil)
+type IntegrationPackagesResp struct {
+	D struct {
+		Results []struct {
+			Metadata struct {
+				ID          string `json:"id"`
+				URI         string `json:"uri"`
+				Type        string `json:"type"`
+				ContentType string `json:"content_type"`
+				MediaSrc    string `json:"media_src"`
+				EditMedia   string `json:"edit_media"`
+			} `json:"__metadata"`
+			ID                             string      `json:"Id"`
+			Name                           string      `json:"Name"`
+			Description                    string      `json:"Description"`
+			Shorttext                      string      `json:"ShortText"`
+			Version                        string      `json:"Version"`
+			Vendor                         string      `json:"Vendor"`
+			Partnercontent                 bool        `json:"PartnerContent"`
+			Updateavailable                bool        `json:"UpdateAvailable"`
+			Mode                           string      `json:"Mode"`
+			Supportedplatform              string      `json:"SupportedPlatform"`
+			Modifiedby                     string      `json:"ModifiedBy"`
+			Creationdate                   string      `json:"CreationDate"`
+			Modifieddate                   string      `json:"ModifiedDate"`
+			Createdby                      string      `json:"CreatedBy"`
+			Products                       string      `json:"Products"`
+			Keywords                       string      `json:"Keywords"`
+			Countries                      string      `json:"Countries"`
+			Industries                     string      `json:"Industries"`
+			Lineofbusiness                 string      `json:"LineOfBusiness"`
+			Packagecontent                 interface{} `json:"PackageContent"`
+			Integrationdesigntimeartifacts struct {
+				Deferred struct {
+					URI string `json:"uri"`
+				} `json:"__deferred"`
+			} `json:"IntegrationDesigntimeArtifacts"`
+			Valuemappingdesigntimeartifacts struct {
+				Deferred struct {
+					URI string `json:"uri"`
+				} `json:"__deferred"`
+			} `json:"ValueMappingDesigntimeArtifacts"`
+			Customtags struct {
+				Deferred struct {
+					URI string `json:"uri"`
+				} `json:"__deferred"`
+			} `json:"CustomTags"`
+		} `json:"results"`
+	} `json:"d"`
+}
+
+func (cfCPIClient *CFCPIClient) GetIntegrationPackages() map[string]string {
+
+	cfCpiIntPkgsURL := fmt.Sprintf("%s/IntegrationPackages", cfCPIClient.cfCpiAPI)
+	httpReqest, err := http.NewRequest("GET", cfCpiIntPkgsURL, nil)
 
 	if err != nil {
-		fmt.Printf("Error occurs when creating http request to get workspace infomation,%v", err)
+		fmt.Printf("Error occurs when creating http request to all packages,%v", err)
 	}
 
 	httpReqest.Header.Set("Accept", "application/json")
@@ -135,79 +155,206 @@ func (cfCPIClient *CFCPIClient) GetCFWorkspaceHttp(cfCPIWorkspaceURL string) {
 	bearerToken := fmt.Sprintf("Bearer %s", cfCPIClient.accessToken)
 
 	httpReqest.Header.Set("Authorization", bearerToken)
-	fmt.Println(httpReqest.Header)
-	httpClient := cfCPIClient.httpClient
+
+	httpClient := cfCPIClient.client
 	httpResp, err := httpClient.Do(httpReqest)
 
 	if err != nil {
 		fmt.Printf("Failed to get response,%v", err)
 	}
-
 	httpResBody := httpResp.Body
-	statusCode := httpResp.StatusCode
 
+	if err != nil {
+		fmt.Printf("Failed to unmarshal json data from response bytes,%v", err)
+	}
 	bodyBytes, err := ioutil.ReadAll(httpResBody)
-	if err != nil {
-		fmt.Printf("Failed to get response body,%v", err)
-	}
-
+	statusCode := httpResp.StatusCode
 	if statusCode != 200 {
-		fmt.Printf("Getting workspace info failed,response boy: %s\n", bodyBytes)
+		fmt.Errorf("Getting workspace info failed,response boy: %s\n", bodyBytes)
+		return map[string]string{}
 	}
-
-	httpResBody.Close()
-}
-
-func (cfCPIClient *CFCPIClient) GetAccessTokenOauth() {
-
-	cfAuthconfig := &clientcredentials.Config{
-		ClientID:     cfCPIClient.clientID,
-		ClientSecret: cfCPIClient.clientSecret,
-		TokenURL:     cfCPIClient.uaaURL + "/oauth/token",
-	}
-
-	ctx := context.Background()
-	token, err := cfAuthconfig.Token(ctx)
 
 	if err != nil {
-		fmt.Printf("Error when generating token from client credentials, %v\n", err)
+		fmt.Printf("Failed to retrieve content bytes  data from response ,%v", err)
 	}
-	fmt.Printf("Access token %v\n", token.AccessToken)
-	oauthClient := cfAuthconfig.Client(ctx)
-	cfCPIClient.accessToken = token.AccessToken
-	cfCPIClient.oauthClient = oauthClient
-}
-func (cfCPIClient *CFCPIClient) GetCFWorkspaceOauth(cfCPIWorkspaceURL string) {
-	httpReqest, err := http.NewRequest("GET", cfCPIWorkspaceURL, nil)
+
+	var cfIntPackgesResp IntegrationPackagesResp
+
+	err = json.Unmarshal(bodyBytes, &cfIntPackgesResp)
 	if err != nil {
-		fmt.Printf("Error when creating http request, %v\n", err)
+		fmt.Printf("Failed to unmarshal json data from response bytes,%v", err)
 	}
-	httpClient := cfCPIClient.oauthClient
+
+	var packageList = map[string]string{}
+	for _, packageInfo := range cfIntPackgesResp.D.Results {
+
+		packageList[packageInfo.Name] = packageInfo.ID
+	}
+	return packageList
+}
+
+type PackageInfoResp struct {
+	D struct {
+		Metadata struct {
+			ID          string `json:"id"`
+			URI         string `json:"uri"`
+			Type        string `json:"type"`
+			ContentType string `json:"content_type"`
+			MediaSrc    string `json:"media_src"`
+			EditMedia   string `json:"edit_media"`
+		} `json:"__metadata"`
+		ID              string      `json:"Id"`
+		Version         string      `json:"Version"`
+		Packageid       string      `json:"PackageId"`
+		Name            string      `json:"Name"`
+		Description     string      `json:"Description"`
+		Sender          string      `json:"Sender"`
+		Receiver        string      `json:"Receiver"`
+		Artifactcontent interface{} `json:"ArtifactContent"`
+		Configurations  struct {
+			Deferred struct {
+				URI string `json:"uri"`
+			} `json:"__deferred"`
+		} `json:"Configurations"`
+		Resources struct {
+			Deferred struct {
+				URI string `json:"uri"`
+			} `json:"__deferred"`
+		} `json:"Resources"`
+	} `json:"d"`
+}
+
+func (cfCPIClient *CFCPIClient) GetIntegrationPackage(packageID string) {
+
+	cfCpiIntPkgURL := fmt.Sprintf("%s/IntegrationPackages('%s')", cfCPIClient.cfCpiAPI, packageID)
+	httpReqest, err := http.NewRequest("GET", cfCpiIntPkgURL, nil)
+
+	if err != nil {
+		fmt.Printf("Error occurs when creating http request to all packages,%v", err)
+	}
 
 	httpReqest.Header.Set("Accept", "application/json")
 
 	bearerToken := fmt.Sprintf("Bearer %s", cfCPIClient.accessToken)
 
 	httpReqest.Header.Set("Authorization", bearerToken)
+
+	httpClient := cfCPIClient.client
 	httpResp, err := httpClient.Do(httpReqest)
 
 	if err != nil {
-		fmt.Printf("Failed to get response,%v\n", err)
+		fmt.Printf("Failed to get response,%v", err)
 	}
-
 	httpResBody := httpResp.Body
+
+	if err != nil {
+		fmt.Printf("Failed to unmarshal json data from response bytes,%v", err)
+	}
+	bodyBytes, err := ioutil.ReadAll(httpResBody)
 	statusCode := httpResp.StatusCode
 
-	bodyBytes, err := ioutil.ReadAll(httpResBody)
-	if err != nil {
-		fmt.Printf("Failed to get response body,%v\n", err)
+	if statusCode != 200 {
+		fmt.Printf("Getting package info failed,status code %d,response boy: %s\n", statusCode, bodyBytes)
+		return
 	}
-	fmt.Printf("Getting workspace info failed,response body: %v\n", httpResBody)
+	if err != nil {
+		fmt.Printf("Failed to retrieve content bytes  data from response ,%v", err)
+	}
+
+	var packageInfoResp PackageInfoResp
+
+	err = json.Unmarshal(bodyBytes, &packageInfoResp)
+	if err != nil {
+		fmt.Printf("Failed to unmarshal json data from response bytes,%v", err)
+	}
+
+	fmt.Printf("Detail info about package %s and its version %s \n", packageID, packageInfoResp.D.Version)
+
+}
+
+type PackageIflowsResp struct {
+	D struct {
+		Results []struct {
+			Metadata struct {
+				ID          string `json:"id"`
+				URI         string `json:"uri"`
+				Type        string `json:"type"`
+				ContentType string `json:"content_type"`
+				MediaSrc    string `json:"media_src"`
+				EditMedia   string `json:"edit_media"`
+			} `json:"__metadata"`
+			ID              string      `json:"Id"`
+			Version         string      `json:"Version"`
+			Packageid       string      `json:"PackageId"`
+			Name            string      `json:"Name"`
+			Description     string      `json:"Description"`
+			Sender          string      `json:"Sender"`
+			Receiver        string      `json:"Receiver"`
+			Artifactcontent interface{} `json:"ArtifactContent"`
+			Configurations  struct {
+				Deferred struct {
+					URI string `json:"uri"`
+				} `json:"__deferred"`
+			} `json:"Configurations"`
+			Resources struct {
+				Deferred struct {
+					URI string `json:"uri"`
+				} `json:"__deferred"`
+			} `json:"Resources"`
+		} `json:"results"`
+	} `json:"d"`
+}
+
+func (cfCPIClient *CFCPIClient) GetIntegrationPackageIflows(packageID string) map[string]string {
+	cfCpiIntPkgURL := fmt.Sprintf("%s/IntegrationPackages('%s')/IntegrationDesigntimeArtifacts", cfCPIClient.cfCpiAPI, packageID)
+	httpReqest, err := http.NewRequest("GET", cfCpiIntPkgURL, nil)
+
+	if err != nil {
+		fmt.Printf("Error occurs when creating http request to get all iflows in package %s ,%v", packageID, err)
+	}
+
+	httpReqest.Header.Set("Accept", "application/json")
+
+	bearerToken := fmt.Sprintf("Bearer %s", cfCPIClient.accessToken)
+
+	httpReqest.Header.Set("Authorization", bearerToken)
+
+	httpClient := cfCPIClient.client
+	httpResp, err := httpClient.Do(httpReqest)
+
+	if err != nil {
+		fmt.Printf("Failed to get response,%v", err)
+	}
+	httpResBody := httpResp.Body
+
+	if err != nil {
+		fmt.Printf("Failed to unmarshal json data from response bytes,%v", err)
+	}
+	bodyBytes, err := ioutil.ReadAll(httpResBody)
+	statusCode := httpResp.StatusCode
 
 	if statusCode != 200 {
-		fmt.Printf("Getting workspace info failed,response body")
+		fmt.Printf("Getting package info failed,status code %d,response boy: %s\n", statusCode, bodyBytes)
+		return map[string]string{}
 	}
-	fmt.Printf("Response Body %v\n", string(bodyBytes))
+	if err != nil {
+		fmt.Printf("Failed to retrieve content bytes  data from response ,%v", err)
+	}
 
-	httpResBody.Close()
+	var packageIflowsResp PackageIflowsResp
+
+	err = json.Unmarshal(bodyBytes, &packageIflowsResp)
+	if err != nil {
+		fmt.Printf("Failed to unmarshal json data from response bytes,%v", err)
+	}
+
+	var iflowInfo = map[string]string{}
+
+	for _, iflow := range packageIflowsResp.D.Results {
+		iflowInfo[iflow.ID] = iflow.Version
+	}
+
+	fmt.Printf("iflown list %v\n", iflowInfo)
+	return iflowInfo
+
 }
